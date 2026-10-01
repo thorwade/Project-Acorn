@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.firebase/
+.firebase-tooling/
+.openai/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+*service-account*.json
+*serviceAccount*.json
+*.pem
+*.key
+*.gdoc
+Acorn Firebase Sign-in.txt
+.DS_Store
+Thumbs.db

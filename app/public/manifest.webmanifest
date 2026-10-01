@@ -1,0 +1,21 @@
+{
+  "name": "Project Acorn",
+  "short_name": "Acorn",
+  "description": "A private home-education hub for planning, diary notes, and learning evidence.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fffaf3",
+  "theme_color": "#7a5eb4",
+  "categories": ["education", "productivity", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/acorn-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

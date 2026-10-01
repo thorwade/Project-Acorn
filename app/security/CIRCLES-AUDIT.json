@@ -1,0 +1,24 @@
+{
+  "score": 4,
+  "summary": "Merged family-and-Circles prototype passed 20 real Firestore emulator tests, a deployment dry-run, rules deployment and exact active-release read-back. This is not an exhaustive production security sign-off.",
+  "findings": [
+    {
+      "check": "Existing family schema validation",
+      "severity": "medium",
+      "issue": "Existing family permissions were preserved exactly. They enforce account ownership but do not validate heterogeneous private document schemas.",
+      "recommendation": "Harden private schemas separately after analysing all existing record shapes, without breaking compatibility."
+    },
+    {
+      "check": "Discoverable metadata",
+      "severity": "medium",
+      "issue": "All authenticated accounts can read circle metadata; names and descriptions must not contain private family information.",
+      "recommendation": "Make visibility clear in the UI and keep sensitive details in member-only event documents."
+    },
+    {
+      "check": "Client integration",
+      "severity": "medium",
+      "issue": "Exact feed queries, private indexing, atomic invitation acceptance and removal/rejoining passed emulator checks. Browser interaction with two real signed-in accounts remains unverified.",
+      "recommendation": "Complete a two-adult-account walkthrough before inviting parents to use the app more broadly."
+    }
+  ]
+}

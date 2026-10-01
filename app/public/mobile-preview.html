@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acorn · Galaxy S26 preview</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#273630,#101416 65%);color:#eef4ee;font:14px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px}h1{font-size:21px;margin:0}p{margin:0;color:#bdc8c0;text-align:center;max-width:650px}a{color:#c9b4ff}.stage{position:relative;flex-shrink:0}.phone{position:absolute;top:0;left:0;width:376px;height:796px;border:8px solid #24282c;border-radius:30px;background:#faf8f2;box-shadow:0 24px 70px #0009,0 0 0 1px #67706f;transform-origin:top left}.screen{width:360px;height:780px;border-radius:22px;overflow:hidden;display:flex;flex-direction:column}.status{height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 16px;color:#24282c;background:#fffaf3;font-size:11px;font-weight:700;position:relative}.camera{position:absolute;left:calc(50% - 5px);top:8px;width:10px;height:10px;border-radius:50%;background:#101315;box-shadow:0 0 0 2px #d8dcda}.status-icons{letter-spacing:2px}.gesture{height:24px;flex-shrink:0;display:grid;place-items:center;background:#fffaf3}.gesture:after{content:'';width:100px;height:4px;background:#303637;border-radius:5px}iframe{display:block;border:0;width:360px;height:728px;flex-shrink:0;background:white}.side-button{position:absolute;right:-11px;top:150px;width:3px;height:45px;border-radius:2px;background:#727977}.side-button.volume{top:78px;height:60px}.note{font-size:12px}
+  </style>
+</head>
+<body>
+  <h1>Acorn on Galaxy S26</h1>
+  <p>Portrait phone preview · scroll inside the screen. The whole phone scales to fit; its proportions never change.</p>
+  <div class="stage" id="stage"><div class="phone" id="phone"><span class="side-button volume"></span><span class="side-button"></span><div class="screen"><div class="status"><span id="time">09:41</span><span class="camera" aria-hidden="true"></span><span class="status-icons" aria-label="Illustrative signal and battery">▴ Wi-Fi ▰</span></div><iframe src="/" title="Project Acorn Galaxy S26 layout preview"></iframe><div class="gesture" aria-hidden="true"></div></div></div></div>
+  <p class="note">S26 screen proportions: 1080 × 2340. Approximate 360px logical width with illustrative Android bars—not an Android emulator.</p>
+  <p class="note"><a href="/">Open full app</a> · <a href="https://www.samsung.com/uk/business/smartphones/galaxy-s/galaxy-s26-black-256gb-sm-s942bzkgeub/" target="_blank" rel="noopener noreferrer">Samsung S26 specifications</a></p>
+  <script>
+    const phone = document.getElementById('phone');
+    const stage = document.getElementById('stage');
+    function fitPhone() {
+      const scale = Math.max(.25, Math.min(1, (window.innerWidth - 40) / 376, (window.innerHeight - 180) / 796));
+      phone.style.transform = `scale(${scale})`;
+      stage.style.width = `${376 * scale}px`;
+      stage.style.height = `${796 * scale}px`;
+    }
+    window.addEventListener('resize', fitPhone);
+    fitPhone();
+    document.getElementById('time').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  </script>
+</body>
+</html>

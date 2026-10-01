@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Project Acorn icon">
+  <rect width="512" height="512" rx="112" fill="#fffaf3"/>
+  <circle cx="382" cy="118" r="98" fill="#dfeedd"/>
+  <circle cx="126" cy="402" r="128" fill="#f0e8fb"/>
+  <path d="M256 150c88 0 150 57 150 146 0 90-70 162-150 162S106 386 106 296c0-89 62-146 150-146Z" fill="#f5d7a6" stroke="#7d6a52" stroke-width="18"/>
+  <path d="M141 192c25-56 72-84 115-84s90 28 115 84c-27 25-69 39-115 39s-88-14-115-39Z" fill="#c98b58" stroke="#7d6a52" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M256 108c-5-34 8-63 38-84" fill="none" stroke="#6f9b63" stroke-width="18" stroke-linecap="round"/>
+  <path d="M297 62c45-20 79-8 101 31-39 19-74 8-101-31Z" fill="#7fb071" stroke="#5b8d54" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M220 301c10 12 22 18 36 18s26-6 36-18" fill="none" stroke="#6f5a46" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="207" cy="276" r="10" fill="#6f5a46"/>
+  <circle cx="305" cy="276" r="10" fill="#6f5a46"/>
+</svg>
+
