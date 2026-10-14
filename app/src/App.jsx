@@ -1,3 +1,9 @@
+import DiaryDateFilters from './DiaryDateFilters.jsx';
+import { todayDate, validDiaryDate, diaryDate, dateLabel, sortDiary, inDiaryDateRange } from './diary-dates.mjs';
+import { normalizeMembers, diaryInSpace, memberLabel, removeMember } from './diary-members.mjs';
+import DiarySubjects from './DiarySubjects.jsx';
+import DiaryForm from './DiaryForm.jsx';
+import { normalizeSubjects } from './diary-subjects.mjs';
 import React, { useEffect, useMemo, useState } from "react";
 import CirclesJourney from "./CirclesJourney.jsx";
 import AccountProfile, { AccountAvatar } from "./AccountProfile.jsx";
@@ -203,7 +209,12 @@ export default function App() {
   const [taskAssignee, setTaskAssignee] = useState("family");
   const [diaryTitle, setDiaryTitle] = useState("");
   const [diaryBody, setDiaryBody] = useState("");
-  const [diaryAssignee, setDiaryAssignee] = useState("family");
+  const [diarySubjects, setDiarySubjects] = useState([]);
+  const [diaryFrom, setDiaryFrom] = useState("");
+  const [diaryTo, setDiaryTo] = useState("");
+  const [diaryDateMode, setDiaryDateMode] = useState("today");
+  const [selectedDiaryDate, setSelectedDiaryDate] = useState(todayDate);
+  const [diaryAssignees, setDiaryAssignees] = useState(["family"]);
   const [diaryFiles, setDiaryFiles] = useState([]);
   const [galleryFiles, setGalleryFiles] = useState([]);
   const [diaryProgress, setDiaryProgress] = useState({});
@@ -232,9 +243,10 @@ export default function App() {
     [space, tasks],
   );
   const visibleDiary = useMemo(
-    () => diaryEntries.filter((entry) => space === "all" || entry.assigneeId === space),
+    () => sortDiary(diaryEntries.filter((entry) => diaryInSpace(entry, space))),
     [space, diaryEntries],
   );
+  const datedDiary = useMemo(() => visibleDiary.filter(entry => inDiaryDateRange(entry, diaryFrom, diaryTo)), [visibleDiary, diaryFrom, diaryTo]);
   const galleryTiles = useMemo(() => {
     const directPhotos = galleryItems.map((item) => ({ ...item, source: "gallery" }));
     const diaryPhotos = diaryEntries.flatMap((entry) =>
@@ -293,6 +305,10 @@ export default function App() {
                   kind,
                   title: String(data.title ?? "Diary note"),
                   body: String(data.body ?? ""),
+                  subjects: normalizeSubjects(data.subjects),
+                  entryDate: diaryDate(data.entryDate, data.createdAt),
+                  createdMillis: data.createdAt?.toMillis?.() || 0,
+                  assigneeIds: normalizeMembers(data.assigneeIds, data.assigneeId),
                   assigneeId: String(data.assigneeId ?? "family"),
                   createdLabel: formatDate(data.createdAt),
                   attachments: Array.isArray(data.attachments)
@@ -484,11 +500,18 @@ export default function App() {
     setSuccess(`Task added for ${spaceLabel(taskAssignee, allChildren)}.`);
   }
 
+  async function saveDiarySubjects(id, subjects) {
+    if (!db || !user) throw new Error('Sign in to save subjects.');
+    await updateDoc(doc(db, "users", user.uid, "tasks", id), { subjects: normalizeSubjects(subjects) });
+  }
+
   async function saveDiary(event) {
     event.preventDefault();
     const title = diaryTitle.trim();
     const body = diaryBody.trim();
     if ((!title && !body && diaryFiles.length === 0) || !db || !user) return;
+    const entryDate = diaryDateMode === "today" ? todayDate() : new FormData(event.currentTarget).get("entryDate");
+    if (!validDiaryDate(entryDate)) { setError("Choose a valid diary date."); return; }
     if (diaryFiles.some(validateDiaryFile)) {
       setError("One or more attachments do not meet the file rules.");
       return;
@@ -500,7 +523,9 @@ export default function App() {
         kind: "diary",
         title: title || "Learning note",
         body,
-        assigneeId: diaryAssignee,
+        assigneeIds: normalizeMembers(diaryAssignees),
+        subjects: normalizeSubjects(diarySubjects),
+        entryDate,
         attachments: [],
         createdAt: serverTimestamp(),
       });
@@ -532,9 +557,12 @@ export default function App() {
       }
       setDiaryTitle("");
       setDiaryBody("");
+      setDiarySubjects([]);
+      setDiaryDateMode("today");
+      setSelectedDiaryDate(todayDate());
       setDiaryFiles([]);
       setDiaryProgress({});
-      setSuccess(`Diary entry saved for ${spaceLabel(diaryAssignee, allChildren)}${attachments.length > 0 ? " with private attachments." : "."}`);
+      setSuccess(`Diary entry saved for ${memberLabel(diaryAssignees, allChildren)}${attachments.length > 0 ? " with private attachments." : "."}`);
       setError("");
     } catch (saveError) {
       setError(storageErrorMessage(saveError));
@@ -640,7 +668,7 @@ export default function App() {
     await updateDoc(doc(db, "users", user.uid, "tasks", child.id), { archived: true });
     if (space === child.id) setSpace("all");
     if (taskAssignee === child.id) setTaskAssignee("family");
-    if (diaryAssignee === child.id) setDiaryAssignee("family");
+    if (diaryAssignees.includes(child.id)) setDiaryAssignees(removeMember(diaryAssignees, child.id));
     setSuccess(`${child.name} was moved to archived family members.`);
   }
 
@@ -978,70 +1006,34 @@ export default function App() {
                 <NotebookPen size={22} aria-hidden="true" />
               </div>
               {spaceTabs}
-              <form className="stacked-form" onSubmit={saveDiary}>
-                <label htmlFor="diary-title">Title</label>
-                <input id="diary-title" value={diaryTitle} onChange={(event) => setDiaryTitle(event.target.value)} placeholder="What did you notice today?" />
-                <label htmlFor="diary-body">Diary entry</label>
-                <textarea id="diary-body" value={diaryBody} onChange={(event) => setDiaryBody(event.target.value)} placeholder="Write a short note about learning, progress, questions, or evidence..." rows={5} />
-                <label htmlFor="diary-assignee">About</label>
-                <select id="diary-assignee" value={diaryAssignee} onChange={(event) => setDiaryAssignee(event.target.value)}>
-                  <option value="family">Whole family</option>
-                  {activeChildren.map((child) => (
-                    <option value={child.id} key={child.id}>
-                      {child.name}
-                    </option>
-                  ))}
-                </select>
-                <label htmlFor="diary-attachments">Private attachments</label>
-                <input id="diary-attachments" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple onChange={(event) => onDiaryFileChange(event.target.files)} />
-                <div className="attachment-strip" aria-label="Attachment rules">
-                  <span>
-                    <Image size={17} aria-hidden="true" />
-                    Images up to 8 MB
-                  </span>
-                  <span>
-                    <Video size={17} aria-hidden="true" />
-                    Videos up to 50 MB
-                  </span>
-                  <span>
-                    <ShieldCheck size={17} aria-hidden="true" />
-                    Private owner access
-                  </span>
-                </div>
-                {diaryFiles.length > 0 && (
-                  <div className="selected-files">
-                    {diaryFiles.map((file) => (
-                      <span key={`${file.name}-${file.size}`}>{file.name} ({formatBytes(file.size)})</span>
-                    ))}
-                  </div>
-                )}
-                {Object.entries(diaryProgress).length > 0 && (
-                  <div className="upload-progress">
-                    {Object.entries(diaryProgress).map(([id, percent]) => (
-                      <span key={id}>Uploading: {percent}%</span>
-                    ))}
-                  </div>
-                )}
-                <button className="primary-action" type="submit" disabled={savingDiary}>
-                  {savingDiary ? <Upload size={18} aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}
-                  {savingDiary ? "Saving..." : "Save diary entry"}
-                </button>
-              </form>
+              <DiaryForm
+                saveDiary={saveDiary} diaryTitle={diaryTitle} setDiaryTitle={setDiaryTitle}
+                diarySubjects={diarySubjects} setDiarySubjects={setDiarySubjects}
+                diaryDateMode={diaryDateMode} setDiaryDateMode={setDiaryDateMode}
+                selectedDiaryDate={selectedDiaryDate} setSelectedDiaryDate={setSelectedDiaryDate}
+                diaryFiles={diaryFiles} onDiaryFileChange={onDiaryFileChange}
+                diaryProgress={diaryProgress} savingDiary={savingDiary}
+                diaryBody={diaryBody} setDiaryBody={setDiaryBody}
+                diaryAssignees={diaryAssignees} setDiaryAssignees={setDiaryAssignees}
+                activeChildren={activeChildren} formatBytes={formatBytes}
+              />
               {previewUrl && (
                 <section className="preview-panel" aria-label="Attachment preview">
                   {previewType.startsWith("image/") ? <img src={previewUrl} alt="Selected diary attachment preview" /> : <video src={previewUrl} controls />}
                 </section>
               )}
+              <DiaryDateFilters from={diaryFrom} to={diaryTo} setFrom={setDiaryFrom} setTo={setDiaryTo} />
               <div className="item-list diary-list" aria-label="Diary entries">
-                {visibleDiary.length === 0 && <p className="empty-state">No diary entries in this space yet.</p>}
-                {visibleDiary.map((entry) => (
+                {datedDiary.length === 0 && <p className="empty-state">No diary entries match this space and date range.</p>}
+                {datedDiary.map((entry) => (
                   <article className="diary-entry" key={entry.id}>
                     <div className="diary-meta">
-                      <span>{entry.createdLabel}</span>
-                      <span>{spaceLabel(entry.assigneeId, allChildren)}</span>
+                      <span>{dateLabel(entry.entryDate)}</span>
+                      <span>{memberLabel(entry.assigneeIds, allChildren)}</span>
                     </div>
                     <h3>{entry.title}</h3>
                     {entry.body && <p>{entry.body}</p>}
+                    <DiarySubjects entry={entry} onSave={saveDiarySubjects} />
                     {entry.attachments.length > 0 ? (
                       <div className="attachment-list">
                         {entry.attachments.map((attachment) => (

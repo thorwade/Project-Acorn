@@ -1,0 +1,12 @@
+.diary-subject-picker > label { display:block; font-weight:700; }
+.diary-subject-picker > p { margin:6px 0 10px; font-size:.9rem; }
+.diary-subject-picker select { width:100%; }
+.diary-subject-tags { display:flex; flex-wrap:wrap; gap:8px; padding:0; margin:10px 0; list-style:none; }
+.diary-subject-tags li { display:inline-flex; align-items:center; gap:8px; border:1px solid currentColor; border-radius:18px; padding:5px 12px; font-size:.9rem; }
+.diary-subject-tags button { min-width:32px; min-height:32px; padding:2px 8px; border-radius:50%; }
+.diary-subject-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.diary-saved-subjects { margin:12px 0; }
+
+.diary-date-control { border:1px solid #b8b4b0; border-radius:16px; padding:12px; }
+.diary-date-control > label { display:inline-flex; align-items:center; gap:8px; margin:4px 18px 8px 0; }
+.diary-date-control input[type=radio] { width:auto; margin:0; }
