@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "project-acorn-1868e",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
