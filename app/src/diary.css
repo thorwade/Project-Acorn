@@ -1,0 +1,13 @@
+.diary-choices { min-width: 0; margin: 0 0 4px; padding: 8px 10px 10px; border: 1px solid #ded4bd; border-radius: 14px; }
+.diary-choices legend { padding: 0 5px; font-size: .82rem; font-weight: 800; color: #53614f; }
+.diary-choices p { margin: 0 0 12px; font-size: .88rem; color: #596759; }
+.diary-choice-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+.stacked-form .diary-choice { display: flex; align-items: center; gap: 6px; min-height: 34px; max-width: 100%; padding: 5px 8px; border: 1px solid #e0d7ea; border-radius: 10px; background: #fffaf0; font-size: .78rem; cursor: pointer; }
+.diary-choice:has(input:checked) { border-color: #7a5eb4; background: #eee7fa; }
+.diary-choice input[type=checkbox] { flex: 0 0 16px; width: 16px; height: 16px; min-height: 16px; margin: 0; padding: 0; accent-color: #7a5eb4; }
+.diary-category-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.diary-category-tags span { padding: 5px 9px; border-radius: 12px; background: #eee7fa; color: #65499a; font-size: .8rem; font-weight: 700; }
+.theme-dark .diary-choices { border-color: #cdbce83d; }
+.theme-dark .diary-choices legend, .theme-dark .diary-choices p, .theme-dark .stacked-form .diary-choice { color: #f6efe2; }
+.theme-dark .stacked-form .diary-choice { background: #2b2e30eb; border-color: #cdbce83d; }
+.theme-dark .diary-choice:has(input:checked), .theme-dark .diary-category-tags span { background: #473a5e; color: #f6efe2; border-color: #b99ef0; }

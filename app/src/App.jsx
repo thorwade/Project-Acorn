@@ -1,12 +1,14 @@
-import DiaryDateFilters from './DiaryDateFilters.jsx';
-import { todayDate, validDiaryDate, diaryDate, dateLabel, sortDiary, inDiaryDateRange } from './diary-dates.mjs';
-import { normalizeMembers, diaryInSpace, memberLabel, removeMember } from './diary-members.mjs';
-import DiarySubjects from './DiarySubjects.jsx';
-import DiaryForm from './DiaryForm.jsx';
-import { normalizeSubjects } from './diary-subjects.mjs';
 import React, { useEffect, useMemo, useState } from "react";
 import CirclesJourney from "./CirclesJourney.jsx";
-import AccountProfile, { AccountAvatar } from "./AccountProfile.jsx";
+import AccountProfile from "./AccountProfile.jsx";
+import AppChrome from "./components/AppChrome.jsx";
+import { HoldingPage, InstallPage } from "./pages/StaticPages.jsx";
+import { HomePage, PlanningPage, TodosPage } from "./pages/PlanningPages.jsx";
+import { DiaryPage, GalleryPage } from "./pages/MediaPages.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
+import ReportsPage from "./pages/ReportsPage.jsx";
+import { spaceLabel } from "./app-helpers.mjs";
+import { diaryMemberIds, diaryCategories, diaryMatchesSpace } from "./diary.mjs";
 import {
   CalendarDays,
   CheckCircle2,
@@ -82,17 +84,6 @@ function formatDate(value) {
     : "Today";
 }
 
-function spaceLabel(id, children) {
-  if (id === "all") return "All spaces";
-  if (id === "family") return "Whole family";
-  return children.find((child) => child.id === id)?.name ?? "Child";
-}
-
-function formatBytes(size) {
-  return size >= 1024 * 1024
-    ? `${(size / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(size / 1024))} KB`;
-}
 
 function authErrorMessage(error) {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
@@ -138,83 +129,19 @@ function safeFileName(name) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-function HoldingPage({ icon, kicker, title, children }) {
-  return (
-    <section className="panel page-panel holding-page">
-      <div className="panel-heading">
-        <div>
-          <p className="section-kicker">{kicker}</p>
-          <h2>{title}</h2>
-        </div>
-        {icon}
-      </div>
-      <div className="holding-copy">{children}</div>
-    </section>
-  );
-}
-
-function InstallPanel({ canPrompt, isStandalone, onInstall }) {
-  return (
-    <div className="install-grid">
-      {isStandalone && (
-        <div className="notice success" role="status">
-          Project Acorn is already running like an installed app on this device.
-        </div>
-      )}
-      <article className="install-card">
-        <span className="feature-icon">
-          <Download size={24} aria-hidden="true" />
-        </span>
-        <h3>Android</h3>
-        <p>
-          On Chrome for Android, tap the install button when it appears. If the browser does not show it yet, open the
-          Chrome menu and choose <strong> Install app</strong> or <strong>Add to Home screen</strong>.
-        </p>
-        <button className="primary-action" type="button" onClick={onInstall}>
-          <Download size={18} aria-hidden="true" />
-          {canPrompt ? "Install on this device" : "Show install guidance"}
-        </button>
-      </article>
-      <article className="install-card">
-        <span className="feature-icon">
-          <Upload size={24} aria-hidden="true" />
-        </span>
-        <h3>iPhone</h3>
-        <p>
-          In Safari, tap the Share button, then choose <strong>Add to Home Screen</strong>. This installs Project Acorn
-          as a home-screen web app. It is not an App Store download.
-        </p>
-      </article>
-      <article className="install-card">
-        <span className="feature-icon">
-          <ShieldCheck size={24} aria-hidden="true" />
-        </span>
-        <h3>Offline note</h3>
-        <p>
-          The app shell can open when your connection is poor, but sign-in, diary uploads, Firestore records, and private
-          media still need a secure internet connection.
-        </p>
-      </article>
-    </div>
-  );
-}
-
 export default function App() {
   const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
   const [activePage, setActivePage] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [space, setSpace] = useState("all");
   const [childName, setChildName] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
-  const [taskAssignee, setTaskAssignee] = useState("family");
+  const [taskAssignees, setTaskAssignees] = useState(["family"]);
   const [diaryTitle, setDiaryTitle] = useState("");
   const [diaryBody, setDiaryBody] = useState("");
-  const [diarySubjects, setDiarySubjects] = useState([]);
-  const [diaryFrom, setDiaryFrom] = useState("");
-  const [diaryTo, setDiaryTo] = useState("");
-  const [diaryDateMode, setDiaryDateMode] = useState("today");
-  const [selectedDiaryDate, setSelectedDiaryDate] = useState(todayDate);
   const [diaryAssignees, setDiaryAssignees] = useState(["family"]);
+  const [educationalCategories, setEducationalCategories] = useState([]);
   const [diaryFiles, setDiaryFiles] = useState([]);
   const [galleryFiles, setGalleryFiles] = useState([]);
   const [diaryProgress, setDiaryProgress] = useState({});
@@ -239,14 +166,13 @@ export default function App() {
   const galleryItems = useMemo(() => records.filter((record) => record.kind === "gallery"), [records]);
   const preferences = useMemo(() => records.find((record) => record.kind === "preferences"), [records]);
   const visibleTasks = useMemo(
-    () => tasks.filter((task) => space === "all" || task.assigneeId === space),
+    () => tasks.filter((task) => diaryMatchesSpace(task, space)),
     [space, tasks],
   );
   const visibleDiary = useMemo(
-    () => sortDiary(diaryEntries.filter((entry) => diaryInSpace(entry, space))),
+    () => diaryEntries.filter((entry) => diaryMatchesSpace(entry, space)),
     [space, diaryEntries],
   );
-  const datedDiary = useMemo(() => visibleDiary.filter(entry => inDiaryDateRange(entry, diaryFrom, diaryTo)), [visibleDiary, diaryFrom, diaryTo]);
   const galleryTiles = useMemo(() => {
     const directPhotos = galleryItems.map((item) => ({ ...item, source: "gallery" }));
     const diaryPhotos = diaryEntries.flatMap((entry) =>
@@ -271,6 +197,8 @@ export default function App() {
       return undefined;
     }
     return onAuthStateChanged(auth, (nextUser) => {
+      setRecords([]);
+      setRecordsLoading(Boolean(nextUser));
       setUser(nextUser);
       setAuthLoading(false);
     });
@@ -279,12 +207,15 @@ export default function App() {
   useEffect(() => {
     if (!db || !user) {
       setRecords([]);
+      setRecordsLoading(false);
       return undefined;
     }
+    setRecordsLoading(true);
     const taskQuery = query(collection(db, "users", user.uid, "tasks"), orderBy("createdAt", "desc"));
     return onSnapshot(
       taskQuery,
       (snapshot) => {
+        setRecordsLoading(false);
         setRecords(
           snapshot.docs
             .map((entry) => {
@@ -305,11 +236,11 @@ export default function App() {
                   kind,
                   title: String(data.title ?? "Diary note"),
                   body: String(data.body ?? ""),
-                  subjects: normalizeSubjects(data.subjects),
-                  entryDate: diaryDate(data.entryDate, data.createdAt),
-                  createdMillis: data.createdAt?.toMillis?.() || 0,
-                  assigneeIds: normalizeMembers(data.assigneeIds, data.assigneeId),
+                  createdAtMs: typeof data.createdAt?.toMillis === "function" ? data.createdAt.toMillis() : null,
+                  entryDate: typeof data.entryDate === "string" ? data.entryDate : "",
                   assigneeId: String(data.assigneeId ?? "family"),
+                  assigneeIds: diaryMemberIds(data),
+                  educationalCategories: diaryCategories(data),
                   createdLabel: formatDate(data.createdAt),
                   attachments: Array.isArray(data.attachments)
                     ? data.attachments.map((attachment) => ({
@@ -320,6 +251,14 @@ export default function App() {
                         type: String(attachment.type ?? ""),
                       }))
                     : [],
+                };
+              }
+              if (kind === "report") {
+                return {
+                  id: entry.id, kind, title: String(data.title || "Learning report"),
+                  from: String(data.from || ""), to: String(data.to || ""),
+                  reportJson: String(data.reportJson || ""), pdfBase64: String(data.pdfBase64 || ""),
+                  createdLabel: formatDate(data.createdAt),
                 };
               }
               if (kind === "gallery") {
@@ -346,6 +285,7 @@ export default function App() {
                 title: String(data.title ?? ""),
                 complete: Boolean(data.complete),
                 assigneeId: String(data.assigneeId ?? "family"),
+                assigneeIds: diaryMemberIds(data),
               };
             })
             .filter((record) => record.kind !== "task" || record.title),
@@ -353,6 +293,7 @@ export default function App() {
         setError("");
       },
       () => {
+        setRecordsLoading(false);
         setError("Could not load the hub. Check Firebase rules for this family space.");
       },
     );
@@ -489,20 +430,25 @@ export default function App() {
     event.preventDefault();
     const title = taskTitle.trim();
     if (!title || !db || !user) return;
+    if (taskAssignees.length === 0) {
+      setError("Select at least one family member or Whole family.");
+      return;
+    }
+    try {
     await addDoc(collection(db, "users", user.uid, "tasks"), {
       kind: "task",
       title,
       complete: false,
-      assigneeId: taskAssignee,
+      assigneeId: taskAssignees[0],
+      assigneeIds: taskAssignees,
       createdAt: serverTimestamp(),
     });
     setTaskTitle("");
-    setSuccess(`Task added for ${spaceLabel(taskAssignee, allChildren)}.`);
-  }
-
-  async function saveDiarySubjects(id, subjects) {
-    if (!db || !user) throw new Error('Sign in to save subjects.');
-    await updateDoc(doc(db, "users", user.uid, "tasks", id), { subjects: normalizeSubjects(subjects) });
+    setSuccess("Task added.");
+    setError("");
+    } catch {
+      setError("Could not save the task. Please try again.");
+    }
   }
 
   async function saveDiary(event) {
@@ -510,8 +456,10 @@ export default function App() {
     const title = diaryTitle.trim();
     const body = diaryBody.trim();
     if ((!title && !body && diaryFiles.length === 0) || !db || !user) return;
-    const entryDate = diaryDateMode === "today" ? todayDate() : new FormData(event.currentTarget).get("entryDate");
-    if (!validDiaryDate(entryDate)) { setError("Choose a valid diary date."); return; }
+    if (diaryAssignees.length === 0) {
+      setError("Select at least one family member or Whole family.");
+      return;
+    }
     if (diaryFiles.some(validateDiaryFile)) {
       setError("One or more attachments do not meet the file rules.");
       return;
@@ -523,9 +471,9 @@ export default function App() {
         kind: "diary",
         title: title || "Learning note",
         body,
-        assigneeIds: normalizeMembers(diaryAssignees),
-        subjects: normalizeSubjects(diarySubjects),
-        entryDate,
+        assigneeId: diaryAssignees[0],
+        assigneeIds: diaryAssignees,
+        educationalCategories,
         attachments: [],
         createdAt: serverTimestamp(),
       });
@@ -557,12 +505,10 @@ export default function App() {
       }
       setDiaryTitle("");
       setDiaryBody("");
-      setDiarySubjects([]);
-      setDiaryDateMode("today");
-      setSelectedDiaryDate(todayDate());
       setDiaryFiles([]);
       setDiaryProgress({});
-      setSuccess(`Diary entry saved for ${memberLabel(diaryAssignees, allChildren)}${attachments.length > 0 ? " with private attachments." : "."}`);
+      setEducationalCategories([]);
+      setSuccess(`Diary entry saved${attachments.length > 0 ? " with private attachments." : "."}`);
       setError("");
     } catch (saveError) {
       setError(storageErrorMessage(saveError));
@@ -667,8 +613,14 @@ export default function App() {
     if (!window.confirm(`Remove ${child.name} from the active family list? Their existing tasks, diary entries, and media will stay private and can be restored later.`)) return;
     await updateDoc(doc(db, "users", user.uid, "tasks", child.id), { archived: true });
     if (space === child.id) setSpace("all");
-    if (taskAssignee === child.id) setTaskAssignee("family");
-    if (diaryAssignees.includes(child.id)) setDiaryAssignees(removeMember(diaryAssignees, child.id));
+    setTaskAssignees(current => {
+      const remaining = current.filter(id => id !== child.id);
+      return remaining.length ? remaining : ["family"];
+    });
+    setDiaryAssignees(current => {
+      const remaining = current.filter(id => id !== child.id);
+      return remaining.length ? remaining : ["family"];
+    });
     setSuccess(`${child.name} was moved to archived family members.`);
   }
 
@@ -693,553 +645,191 @@ export default function App() {
     setMenuOpen(false);
   }
 
-  const spaceTabs = (
-    <div className="space-tabs" aria-label="Select family or child space">
-      <button className={space === "all" ? "space-tab active" : "space-tab"} type="button" onClick={() => setSpace("all")}>
-        <Users size={16} aria-hidden="true" />
-        All
-      </button>
-      <button className={space === "family" ? "space-tab active" : "space-tab"} type="button" onClick={() => setSpace("family")}>
-        <UserRound size={16} aria-hidden="true" />
-        Family
-      </button>
-      {activeChildren.map((child) => (
-        <button className={space === child.id ? "space-tab active" : "space-tab"} type="button" onClick={() => setSpace(child.id)} key={child.id}>
-          <span className="child-dot" style={{ backgroundColor: child.colour }} />
-          {child.name}
-        </button>
-      ))}
-    </div>
-  );
-
-  const bottomNav = [
-    { id: "home", label: "Home", icon: <Users size={22} aria-hidden="true" /> },
-    { id: "events", label: "Events", icon: <CalendarDays size={22} aria-hidden="true" /> },
-    { id: "circles", label: "Circles", icon: <Users size={22} aria-hidden="true" /> },
-    { id: "todos", label: "To-do", icon: <ListTodo size={22} aria-hidden="true" /> },
-    { id: "diary", label: "Diary", icon: <NotebookPen size={22} aria-hidden="true" /> },
-  ];
-
-  const menuItems = [
-    { id: "home", label: "Home", icon: <Users size={18} aria-hidden="true" /> },
-    { id: "events", label: "Events", icon: <CalendarDays size={18} aria-hidden="true" /> },
-    { id: "circles", label: "Circles", icon: <Users size={18} aria-hidden="true" /> },
-    { id: "todos", label: "To-do List", icon: <ListTodo size={18} aria-hidden="true" /> },
-    { id: "profile", label: "Profile", icon: <UserRound size={18} aria-hidden="true" /> },
-    { id: "diary", label: "Diary", icon: <NotebookPen size={18} aria-hidden="true" /> },
-    { id: "gallery", label: "Gallery", icon: <Image size={18} aria-hidden="true" /> },
-    { id: "planning", label: "Planning", icon: <CalendarDays size={18} aria-hidden="true" /> },
-    { id: "settings", label: "Settings", icon: <Settings size={18} aria-hidden="true" /> },
-    { id: "contact", label: "Contact Us", icon: <Mail size={18} aria-hidden="true" /> },
-    { id: "install", label: "Install App", icon: <Download size={18} aria-hidden="true" /> },
-  ];
-
   return (
     <main data-page={activePage} className={`app-shell ${theme === "dark" ? "theme-dark" : ""}`}>
-      <header className="app-header">
-        <button className="menu-button" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label="Open menu">
-          {menuOpen ? <X size={23} /> : <Menu size={23} />}
-        </button>
-        <span className="brand-lockup">
-          <span className="acorn-mark" aria-hidden="true">
-            <Leaf size={18} />
-          </span>
-          Acorn
-        </span>
-      </header>
-
-      {menuOpen && (
-        <aside className="menu-panel" aria-label="Menu">
-          <div className="menu-hero">
-            <span className="acorn-mark large" aria-hidden="true">
-              <Leaf size={28} />
-            </span>
-            <strong>Acorn</strong>
-            <span>Private family learning hub</span>
-          </div>
-          {menuItems.map((item) => (
-            <button className={activePage === item.id ? "active" : ""} type="button" onClick={() => navigate(item.id)} key={item.id}>
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-          <div className="menu-account">
-            <span>{user ? `Signed in as ${user.displayName || user.email || "your account"}` : "Account"}</span>
-            {user ? (
-              <button type="button" onClick={handleSignOut}>
-                <LogOut size={18} aria-hidden="true" />
-                Sign out
-              </button>
-            ) : (
-              <button type="button" onClick={handleSignIn}>
-                <LogIn size={18} aria-hidden="true" />
-                Sign in with Google
-              </button>
-            )}
-          </div>
-          {user && (
-            <button className="mobile-menu-signout" type="button" onClick={handleSignOut}>
-              <LogOut size={18} aria-hidden="true" />
-              Sign out
-            </button>
-          )}
-        </aside>
-      )}
-
-      <section className="hero-panel">
-        <div>
-          <p className="eyebrow">
-            <span className="acorn-mark mini" aria-hidden="true">
-              <Leaf size={14} />
-            </span>
-            Project Acorn
-          </p>
-          <h1>Home Education Hub</h1>
-          <p className="hero-copy">
-            Plan the week, capture learning moments, and keep each child's journey private in one calm family space.
-          </p>
-          <p className="hero-tagline">Creating for home education by home educators</p>
-        </div>
-        {!user && (
-          <button className="secondary-action" type="button" onClick={handleSignIn}>
-            <LogIn size={18} aria-hidden="true" />
-            Sign in with Google
-          </button>
-        )}
-        {user && (
-          <button className="secondary-action account-shortcut" type="button" onClick={() => navigate("profile")} aria-label="View signed-in profile">
-            <AccountAvatar user={user} />
-            <span>{user.displayName || user.email || "Your account"}</span>
-          </button>
-        )}
-      </section>
-
-      <nav className="bottom-nav" aria-label="Primary sections">
-        {bottomNav.map((item) => (
-          <button className={activePage === item.id ? "active" : ""} type="button" onClick={() => navigate(item.id)} key={item.id}>
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      <AppChrome
+        activePage={activePage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        user={user}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+      />
 
       {!isFirebaseConfigured && (
         <section className="notice" role="status">
-          Add your Firebase config values to `.env.local`, then restart the app.
+          Add your Firebase config values to <code>.env.local</code>, then restart the app.
         </section>
       )}
-      {error && (
-        <section className="notice error" role="alert">
-          {error}
-        </section>
-      )}
-      {success && (
-        <section className="notice success" role="status">
-          {success}
-        </section>
-      )}
+      {error && <section className="notice error" role="alert">{error}</section>}
+      {success && <section className="notice success" role="status">{success}</section>}
 
       {!authLoading && !user && activePage === "home" && (
         <section className="empty-state">Sign in to open your private family hub.</section>
       )}
 
-      <CirclesJourney key={user?.uid || 'signed-out'} page={activePage} user={user} onNavigate={navigate} />
+      <CirclesJourney
+        key={user?.uid || "signed-out"}
+        page={activePage}
+        user={user}
+        onNavigate={navigate}
+      />
+
+      {activePage === "install" && (
+        <InstallPage
+          canPrompt={Boolean(installPrompt)}
+          isStandalone={standalone}
+          onInstall={handleInstall}
+        />
+      )}
 
       {!authLoading && !user && activePage === "gallery" && (
-        <HoldingPage icon={<Image size={24} aria-hidden="true" />} kicker="Gallery" title="Gallery will gather private evidence">
+        <HoldingPage
+          icon={<Image size={24} aria-hidden="true" />}
+          kicker="Gallery"
+          title="Gallery will gather private evidence"
+        >
           <p>Sign in to browse your private family photo evidence in one place.</p>
           <p>Only the signed-in owner can see or manage their Gallery photos.</p>
         </HoldingPage>
       )}
 
-      {!authLoading && !user && activePage === "contact" && (
-        <HoldingPage icon={<Mail size={24} aria-hidden="true" />} kicker="Contact Us" title="Contact options will go here">
+      {activePage === "contact" && (
+        <HoldingPage
+          icon={<Mail size={24} aria-hidden="true" />}
+          kicker="Contact Us"
+          title={user ? "Support and contact options will go here" : "Contact options will go here"}
+        >
           <p>This page will hold support and feedback options later. It does not send messages yet.</p>
+          {user && (
+            <p>
+              Project Acorn keeps your family content private and does not share diary, task,
+              child, or media records through this page.
+            </p>
+          )}
         </HoldingPage>
       )}
 
-      {!authLoading && !user && activePage === "install" && (
-        <section className="panel page-panel install-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="section-kicker">Install</p>
-              <h2>Add Project Acorn to your phone</h2>
-            </div>
-            <Download size={24} aria-hidden="true" />
-          </div>
-          <InstallPanel canPrompt={Boolean(installPrompt)} isStandalone={standalone} onInstall={handleInstall} />
-        </section>
-      )}
-
-      {!authLoading && !user && ["todos", "diary", "profile", "planning", "settings"].includes(activePage) && (
-        <HoldingPage icon={<ShieldCheck size={24} aria-hidden="true" />} kicker="Private area" title="Sign in to continue">
-          <p>This section uses your private Project Acorn family records. Sign in with Google to open it.</p>
-        </HoldingPage>
-      )}
+      {!authLoading &&
+        !user &&
+        ["todos", "diary", "reports", "profile", "planning", "settings"].includes(activePage) && (
+          <HoldingPage
+            icon={<ShieldCheck size={24} aria-hidden="true" />}
+            kicker="Private area"
+            title="Sign in to continue"
+          >
+            <p>This section uses your private Project Acorn family records. Sign in with Google to open it.</p>
+          </HoldingPage>
+        )}
 
       {user && (
         <>
           {activePage === "home" && (
-            <section className="home-grid">
-              <article className="feature-card lavender">
-                <span className="feature-icon">
-                  <CalendarDays size={24} aria-hidden="true" />
-                </span>
-                <p className="section-kicker">Today</p>
-                <h2>Family rhythm</h2>
-                <p>Choose a child or the whole family, then move into Planning, To-do, or Diary to organise the day.</p>
-              </article>
-              <article className="feature-card green">
-                <span className="feature-icon">
-                  <ListTodo size={24} aria-hidden="true" />
-                </span>
-                <p className="section-kicker">To-do</p>
-                <h2>{openTaskCount} open tasks</h2>
-                <p>Tasks stay private and can be assigned to the family or an individual child.</p>
-              </article>
-              <article className="feature-card peach">
-                <span className="feature-icon">
-                  <NotebookPen size={24} aria-hidden="true" />
-                </span>
-                <p className="section-kicker">Diary</p>
-                <h2>{visibleDiary.length} diary notes</h2>
-                <p>Capture evidence with text, photos, or videos in your private learning diary.</p>
-              </article>
-            </section>
-          )}
-
-          {activePage === "install" && (
-            <section className="panel page-panel install-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-kicker">Install</p>
-                  <h2>Add Project Acorn to your phone</h2>
-                </div>
-                <Download size={24} aria-hidden="true" />
-              </div>
-              <InstallPanel canPrompt={Boolean(installPrompt)} isStandalone={standalone} onInstall={handleInstall} />
-            </section>
+            <HomePage openTaskCount={openTaskCount} diaryCount={visibleDiary.length} />
           )}
 
           {activePage === "planning" && (
-            <section className="panel page-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-kicker">Planning</p>
-                  <h2>{spaceLabel(space, allChildren)} overview</h2>
-                </div>
-                <CalendarDays size={22} aria-hidden="true" />
-              </div>
-              {spaceTabs}
-              <div className="planning-grid">
-                <article>
-                  <strong>{openTaskCount}</strong>
-                  <span>open tasks in this space</span>
-                </article>
-                <article>
-                  <strong>{visibleDiary.length}</strong>
-                  <span>diary notes captured</span>
-                </article>
-                <article>
-                  <strong>{activeChildren.length}</strong>
-                  <span>child spaces in the family hub</span>
-                </article>
-              </div>
-              <p className="planning-note">Use Planning to choose the family or child context, then move to To-dos or Diary to add work and evidence for that space.</p>
-            </section>
+            <PlanningPage
+              space={space}
+              setSpace={setSpace}
+              allChildren={allChildren}
+              activeChildren={activeChildren}
+              openTaskCount={openTaskCount}
+              diaryCount={visibleDiary.length}
+            />
           )}
 
           {activePage === "todos" && (
-            <section className="panel page-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-kicker">To-dos</p>
-                  <h2>{spaceLabel(space, allChildren)} tasks</h2>
-                </div>
-                <ListTodo size={22} aria-hidden="true" />
-              </div>
-              {spaceTabs}
-              <form className="stacked-form" onSubmit={addTask}>
-                <label htmlFor="task-title">Task</label>
-                <input id="task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Reading, nature walk, maths practice..." />
-                <label htmlFor="task-assignee">For</label>
-                <select id="task-assignee" value={taskAssignee} onChange={(event) => setTaskAssignee(event.target.value)}>
-                  <option value="family">Whole family</option>
-                  {activeChildren.map((child) => (
-                    <option value={child.id} key={child.id}>
-                      {child.name}
-                    </option>
-                  ))}
-                </select>
-                <button className="primary-action" type="submit">
-                  <Plus size={18} aria-hidden="true" />
-                  Add task
-                </button>
-              </form>
-              <div className="item-list" aria-label="Tasks">
-                {visibleTasks.length === 0 && <p className="empty-state">No tasks in this space yet.</p>}
-                {visibleTasks.map((task) => (
-                  <article className="list-item" key={task.id}>
-                    <button className="icon-button" type="button" onClick={() => toggleTask(task)} aria-label={task.complete ? "Mark task incomplete" : "Mark task done"}>
-                      {task.complete ? <CheckCircle2 size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}
-                    </button>
-                    <div>
-                      <strong className={task.complete ? "complete" : ""}>{task.title}</strong>
-                      <span>{spaceLabel(task.assigneeId, allChildren)}</span>
-                    </div>
-                    <button className="icon-button subtle" type="button" onClick={() => deleteTask(task.id)} aria-label="Delete task">
-                      <Trash2 size={18} aria-hidden="true" />
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
+            <TodosPage
+              allChildren={allChildren}
+              activeChildren={activeChildren}
+              taskTitle={taskTitle}
+              setTaskTitle={setTaskTitle}
+              taskAssignees={taskAssignees}
+              setTaskAssignees={setTaskAssignees}
+              signedInMember={{ id: user.uid, name: user.displayName || "Me" }}
+              addTask={addTask}
+              visibleTasks={tasks}
+              toggleTask={toggleTask}
+              deleteTask={deleteTask}
+            />
           )}
 
           {activePage === "diary" && (
-            <section className="panel page-panel diary-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-kicker">Diary</p>
-                  <h2>Learning diary</h2>
-                </div>
-                <NotebookPen size={22} aria-hidden="true" />
-              </div>
-              {spaceTabs}
-              <DiaryForm
-                saveDiary={saveDiary} diaryTitle={diaryTitle} setDiaryTitle={setDiaryTitle}
-                diarySubjects={diarySubjects} setDiarySubjects={setDiarySubjects}
-                diaryDateMode={diaryDateMode} setDiaryDateMode={setDiaryDateMode}
-                selectedDiaryDate={selectedDiaryDate} setSelectedDiaryDate={setSelectedDiaryDate}
-                diaryFiles={diaryFiles} onDiaryFileChange={onDiaryFileChange}
-                diaryProgress={diaryProgress} savingDiary={savingDiary}
-                diaryBody={diaryBody} setDiaryBody={setDiaryBody}
-                diaryAssignees={diaryAssignees} setDiaryAssignees={setDiaryAssignees}
-                activeChildren={activeChildren} formatBytes={formatBytes}
-              />
-              {previewUrl && (
-                <section className="preview-panel" aria-label="Attachment preview">
-                  {previewType.startsWith("image/") ? <img src={previewUrl} alt="Selected diary attachment preview" /> : <video src={previewUrl} controls />}
-                </section>
-              )}
-              <DiaryDateFilters from={diaryFrom} to={diaryTo} setFrom={setDiaryFrom} setTo={setDiaryTo} />
-              <div className="item-list diary-list" aria-label="Diary entries">
-                {datedDiary.length === 0 && <p className="empty-state">No diary entries match this space and date range.</p>}
-                {datedDiary.map((entry) => (
-                  <article className="diary-entry" key={entry.id}>
-                    <div className="diary-meta">
-                      <span>{dateLabel(entry.entryDate)}</span>
-                      <span>{memberLabel(entry.assigneeIds, allChildren)}</span>
-                    </div>
-                    <h3>{entry.title}</h3>
-                    {entry.body && <p>{entry.body}</p>}
-                    <DiarySubjects entry={entry} onSave={saveDiarySubjects} />
-                    {entry.attachments.length > 0 ? (
-                      <div className="attachment-list">
-                        {entry.attachments.map((attachment) => (
-                          <div className="attachment-row" key={attachment.id}>
-                            <span>{attachment.name} ({formatBytes(attachment.size)})</span>
-                            <button type="button" onClick={() => previewMedia(attachment)}>
-                              <Eye size={16} aria-hidden="true" />
-                              View
-                            </button>
-                            <button type="button" onClick={() => removeAttachment(entry, attachment)}>
-                              <Trash2 size={16} aria-hidden="true" />
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="attachment-note">No attachments saved for this entry.</div>
-                    )}
-                  </article>
-                ))}
-              </div>
-            </section>
+            <DiaryPage
+              allChildren={allChildren}
+              activeChildren={activeChildren}
+              diaryTitle={diaryTitle}
+              setDiaryTitle={setDiaryTitle}
+              diaryBody={diaryBody}
+              setDiaryBody={setDiaryBody}
+              diaryAssignees={diaryAssignees}
+              setDiaryAssignees={setDiaryAssignees}
+              educationalCategories={educationalCategories}
+              setEducationalCategories={setEducationalCategories}
+              signedInMember={{ id: user.uid, name: user.displayName || "Me" }}
+              diaryFiles={diaryFiles}
+              diaryProgress={diaryProgress}
+              onDiaryFileChange={onDiaryFileChange}
+              saveDiary={saveDiary}
+              savingDiary={savingDiary}
+              previewUrl={previewUrl}
+              previewType={previewType}
+              visibleDiary={diaryEntries}
+              previewMedia={previewMedia}
+              removeAttachment={removeAttachment}
+            />
           )}
 
           {activePage === "gallery" && (
-            <section className="panel page-panel gallery-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-kicker">Gallery</p>
-                  <h2>Private photo evidence</h2>
-                </div>
-                <Image size={22} aria-hidden="true" />
-              </div>
-              <form className="stacked-form gallery-upload" onSubmit={addGalleryPhotos}>
-                <label htmlFor="gallery-photos">Add photos straight to Gallery</label>
-                <input id="gallery-photos" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={(event) => onGalleryFileChange(event.target.files)} />
-                <div className="attachment-strip" aria-label="Gallery photo rules">
-                  <span>
-                    <Image size={17} aria-hidden="true" />
-                    Photos up to 8 MB
-                  </span>
-                  <span>
-                    <ShieldCheck size={17} aria-hidden="true" />
-                    Owner-only access
-                  </span>
-                  <span>
-                    <ShieldCheck size={17} aria-hidden="true" />
-                    No public links
-                  </span>
-                </div>
-                {galleryFiles.length > 0 && (
-                  <div className="selected-files">
-                    {galleryFiles.map((file) => (
-                      <span key={`${file.name}-${file.size}`}>{file.name} ({formatBytes(file.size)})</span>
-                    ))}
-                  </div>
-                )}
-                {Object.entries(galleryProgress).length > 0 && (
-                  <div className="upload-progress">
-                    {Object.entries(galleryProgress).map(([id, percent]) => (
-                      <span key={id}>Uploading photo: {percent}%</span>
-                    ))}
-                  </div>
-                )}
-                <button className="primary-action" type="submit" disabled={savingGallery || galleryFiles.length === 0}>
-                  {savingGallery ? <Upload size={18} aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}
-                  {savingGallery ? "Adding..." : "Add to Gallery"}
-                </button>
-              </form>
-              {previewUrl && (
-                <section className="preview-panel" aria-label="Private media preview">
-                  {previewType.startsWith("image/") ? <img src={previewUrl} alt="Private gallery preview" /> : <video src={previewUrl} controls />}
-                </section>
-              )}
-              {galleryTiles.length === 0 ? (
-                <p className="empty-state">No photos yet. Diary image attachments and direct Gallery uploads will appear here privately.</p>
-              ) : (
-                <div className="gallery-grid" aria-label="Private Gallery photos">
-                  {galleryTiles.map((item) => (
-                    <article className="gallery-tile" key={item.id}>
-                      <button className="gallery-thumb" type="button" onClick={() => previewMedia(item)}>
-                        <Image size={26} aria-hidden="true" />
-                        <span>Tap to view</span>
-                      </button>
-                      <div className="gallery-copy">
-                        <span className={item.source === "diary" ? "source-badge diary" : "source-badge"}>{item.source === "diary" ? "From Diary" : "Gallery"}</span>
-                        <strong>{item.name}</strong>
-                        <span>{item.createdLabel} · {formatBytes(item.size)}</span>
-                        {item.diaryTitle && <span>Diary: {item.diaryTitle}</span>}
-                      </div>
-                      <div className="gallery-actions">
-                        <button type="button" onClick={() => previewMedia(item)}>
-                          <Eye size={16} aria-hidden="true" />
-                          View
-                        </button>
-                        {item.source === "gallery" ? (
-                          <button type="button" onClick={() => removeGalleryItem(item)}>
-                            <Trash2 size={16} aria-hidden="true" />
-                            Remove
-                          </button>
-                        ) : (
-                          <span>Remove from Diary entry</span>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
+            <GalleryPage
+              galleryFiles={galleryFiles}
+              galleryProgress={galleryProgress}
+              onGalleryFileChange={onGalleryFileChange}
+              addGalleryPhotos={addGalleryPhotos}
+              savingGallery={savingGallery}
+              previewUrl={previewUrl}
+              previewType={previewType}
+              galleryTiles={galleryTiles}
+              previewMedia={previewMedia}
+              removeGalleryItem={removeGalleryItem}
+            />
+          )}
+
+          {activePage === "reports" && (
+            <ReportsPage
+              key={user.uid}
+              user={user}
+              entries={diaryEntries}
+              members={[{ id: user.uid, name: user.displayName || "Me" }, ...allChildren]}
+              savedReports={records.filter(record => record.kind === "report")}
+              loading={recordsLoading}
+            />
           )}
 
           {activePage === "profile" && (
-            <AccountProfile user={user} onSignOut={handleSignOut} onSettings={() => navigate("settings")} />
-          )}
-
-          {activePage === "contact" && (
-            <HoldingPage icon={<Mail size={24} aria-hidden="true" />} kicker="Contact Us" title="Support and contact options will go here">
-              <p>This is a holding page for future support, feedback, and help options. It does not send messages yet.</p>
-              <p>For now, Project Acorn keeps your family content private and does not share diary, task, child, or media records through this page.</p>
-            </HoldingPage>
+            <AccountProfile
+              user={user}
+              onSignOut={handleSignOut}
+              onSettings={() => navigate("settings")}
+            />
           )}
 
           {activePage === "settings" && (
-            <section className="workspace-grid">
-              <div className="panel child-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="section-kicker">Settings</p>
-                    <h2>Child profiles</h2>
-                  </div>
-                  <Users size={22} aria-hidden="true" />
-                </div>
-                {spaceTabs}
-                <form className="inline-form" onSubmit={addChild}>
-                  <label htmlFor="child-name">Add child</label>
-                  <div className="input-row">
-                    <input id="child-name" value={childName} onChange={(event) => setChildName(event.target.value)} placeholder="Child's name" />
-                    <button type="submit" aria-label="Add child">
-                      <Plus size={19} aria-hidden="true" />
-                    </button>
-                  </div>
-                </form>
-                <div className="settings-list" aria-label="Active family members">
-                  <h3>Active family members</h3>
-                  {activeChildren.length === 0 ? (
-                    <p className="empty-state">No active child profiles yet.</p>
-                  ) : (
-                    activeChildren.map((child) => (
-                      <article className="settings-row" key={child.id}>
-                        <span className="child-dot" style={{ backgroundColor: child.colour }} />
-                        <strong>{child.name}</strong>
-                        <button type="button" onClick={() => archiveChild(child)} aria-label={`Remove ${child.name} from active family members`}>
-                          <Trash2 size={16} aria-hidden="true" />
-                          Remove from family
-                        </button>
-                      </article>
-                    ))
-                  )}
-                </div>
-                <div className="settings-list" aria-label="Archived family members">
-                  <h3>Archived family members</h3>
-                  <p className="settings-note">Archived members are hidden from active selectors, but their existing private history is preserved.</p>
-                  {archivedChildren.length === 0 ? (
-                    <p className="attachment-note">No archived family members.</p>
-                  ) : (
-                    archivedChildren.map((child) => (
-                      <article className="settings-row archived" key={child.id}>
-                        <span className="child-dot" style={{ backgroundColor: child.colour }} />
-                        <strong>{child.name}</strong>
-                        <button type="button" onClick={() => restoreChild(child)} aria-label={`Restore ${child.name} to active family members`}>
-                          <Plus size={16} aria-hidden="true" />
-                          Restore
-                        </button>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="panel privacy-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="section-kicker">Family settings</p>
-                    <h2>Private by default</h2>
-                  </div>
-                  <ShieldCheck size={22} aria-hidden="true" />
-                </div>
-                <p>
-                  Family records and media are stored under the signed-in account. Sharing with local education authorities should be added later with controlled, revocable view-only access.
-                </p>
-                <div className="appearance-panel" aria-label="Appearance settings">
-                  <h3>Appearance</h3>
-                  <div className="theme-choice" role="group" aria-label="Choose theme">
-                    <button className={theme === "light" ? "active" : ""} type="button" onClick={() => setAppearance("light")}>
-                      <Sun size={17} aria-hidden="true" />
-                      Light
-                    </button>
-                    <button className={theme === "dark" ? "active" : ""} type="button" onClick={() => setAppearance("dark")}>
-                      <Moon size={17} aria-hidden="true" />
-                      Dark
-                    </button>
-                  </div>
-                  <p>This is your personal display preference and does not change the app for other families.</p>
-                </div>
-              </div>
-            </section>
+            <SettingsPage
+              space={space}
+              setSpace={setSpace}
+              activeChildren={activeChildren}
+              archivedChildren={archivedChildren}
+              childName={childName}
+              setChildName={setChildName}
+              addChild={addChild}
+              archiveChild={archiveChild}
+              restoreChild={restoreChild}
+              theme={theme}
+              setAppearance={setAppearance}
+            />
           )}
         </>
       )}
